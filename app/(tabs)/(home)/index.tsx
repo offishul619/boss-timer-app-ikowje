@@ -227,7 +227,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.content}>
         <Image 
-          source={require('@/assets/images/ae56c5a2-88ea-4b5c-91a4-a5f22d06080b.webp')}
+          source={require('@/assets/images/4f3bc69d-9004-4977-8c4d-af99dd8316c5.webp')}
           style={styles.logo}
           resizeMode="contain"
         />
