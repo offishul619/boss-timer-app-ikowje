@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Platform,
   Alert,
   Image,
@@ -24,24 +23,22 @@ Notifications.setNotificationHandler({
 });
 
 const STORAGE_KEY = '@boss_timer_last_spawn';
-const TWELVE_HOURS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
-const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
+const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 interface TimeRemaining {
   hours: number;
   minutes: number;
   seconds: number;
   inWindow: boolean;
-  windowEndsIn: number;
 }
 
 export default function HomeScreen() {
   const [lastSpawnTime, setLastSpawnTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   useEffect(() => {
     initializeApp();
@@ -72,17 +69,11 @@ export default function HomeScreen() {
         finalStatus = status;
       }
 
-      setPermissionStatus(finalStatus);
-
       if (finalStatus !== 'granted') {
-        Alert.alert(
-          'Permissions Required',
-          'Please enable notifications to receive boss spawn alerts.'
-        );
+        console.log('Notification permissions not granted');
         return false;
       }
 
-      // Set up notification channel for Android
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('boss-timer', {
           name: 'Boss Timer Notifications',
@@ -115,7 +106,9 @@ export default function HomeScreen() {
   const loadNotificationSettings = async () => {
     try {
       const enabled = await AsyncStorage.getItem('@notifications_enabled');
-      setNotificationsEnabled(enabled === 'true');
+      if (enabled !== null) {
+        setNotificationsEnabled(enabled === 'true');
+      }
     } catch (error) {
       console.error('Error loading notification settings:', error);
     }
@@ -127,31 +120,24 @@ export default function HomeScreen() {
 
     const now = Date.now();
     const timeSinceSpawn = now - time;
-    const windowStartTime = time + TWELVE_HOURS;
-    const windowEndTime = time + TWENTY_FOUR_HOURS;
 
     if (timeSinceSpawn < TWELVE_HOURS) {
-      // Before window starts
       const remaining = TWELVE_HOURS - timeSinceSpawn;
       setTimeRemaining({
         hours: Math.floor(remaining / ONE_HOUR),
         minutes: Math.floor((remaining % ONE_HOUR) / 60000),
         seconds: Math.floor((remaining % 60000) / 1000),
         inWindow: false,
-        windowEndsIn: 0,
       });
     } else if (timeSinceSpawn < TWENTY_FOUR_HOURS) {
-      // In spawn window
-      const windowRemaining = windowEndTime - now;
+      const windowRemaining = TWENTY_FOUR_HOURS - timeSinceSpawn;
       setTimeRemaining({
         hours: Math.floor(windowRemaining / ONE_HOUR),
         minutes: Math.floor((windowRemaining % ONE_HOUR) / 60000),
         seconds: Math.floor((windowRemaining % 60000) / 1000),
         inWindow: true,
-        windowEndsIn: windowRemaining,
       });
     } else {
-      // Window has ended
       setTimeRemaining(null);
     }
   };
@@ -162,11 +148,8 @@ export default function HomeScreen() {
     
     try {
       await AsyncStorage.setItem(STORAGE_KEY, now.toString());
-      
-      // Cancel all existing notifications
       await Notifications.cancelAllScheduledNotificationsAsync();
       
-      // Schedule new notifications if enabled
       if (notificationsEnabled) {
         await scheduleNotifications(now);
       }
@@ -180,11 +163,8 @@ export default function HomeScreen() {
 
   const scheduleNotifications = async (spawnTime: number) => {
     try {
-      const windowStart = spawnTime + TWELVE_HOURS;
-      const windowEnd = spawnTime + TWENTY_FOUR_HOURS;
       const now = Date.now();
 
-      // Schedule hourly notifications during the 12-24 hour window
       for (let i = 12; i < 24; i++) {
         const notificationTime = spawnTime + (i * ONE_HOUR);
         
@@ -207,8 +187,7 @@ export default function HomeScreen() {
         }
       }
 
-      // Schedule 15-minute notifications for the last hour
-      const lastHourStart = windowEnd - ONE_HOUR;
+      const lastHourStart = spawnTime + (23 * ONE_HOUR);
       if (lastHourStart > now) {
         for (let i = 0; i < 4; i++) {
           const notificationTime = lastHourStart + (i * FIFTEEN_MINUTES);
@@ -239,142 +218,41 @@ export default function HomeScreen() {
     }
   };
 
-  const toggleNotifications = async () => {
-    const newValue = !notificationsEnabled;
-    setNotificationsEnabled(newValue);
-    
-    try {
-      await AsyncStorage.setItem('@notifications_enabled', newValue.toString());
-      
-      if (newValue && lastSpawnTime) {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-        await scheduleNotifications(lastSpawnTime);
-        Alert.alert('Notifications Enabled', 'You will receive spawn alerts.');
-      } else {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-        Alert.alert('Notifications Disabled', 'You will not receive spawn alerts.');
-      }
-    } catch (error) {
-      console.error('Error toggling notifications:', error);
-    }
-  };
-
-  const resetTimer = async () => {
-    Alert.alert(
-      'Reset Timer',
-      'Are you sure you want to reset the boss timer?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem(STORAGE_KEY);
-              await Notifications.cancelAllScheduledNotificationsAsync();
-              setLastSpawnTime(null);
-              setTimeRemaining(null);
-              Alert.alert('Timer Reset', 'Boss timer has been reset.');
-            } catch (error) {
-              console.error('Error resetting timer:', error);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const formatTime = (time: TimeRemaining) => {
     const pad = (num: number) => num.toString().padStart(2, '0');
     return `${pad(time.hours)}:${pad(time.minutes)}:${pad(time.seconds)}`;
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={styles.content}>
         <Image 
           source={require('@/assets/images/ae56c5a2-88ea-4b5c-91a4-a5f22d06080b.webp')}
           style={styles.logo}
           resizeMode="contain"
         />
+        
         <Text style={styles.title}>Devils of Ascension</Text>
         <Text style={styles.subtitle}>Contested Timer</Text>
-      </View>
 
-      <View style={styles.card}>
-        {!lastSpawnTime ? (
-          <View style={styles.noTimerContainer}>
-            <Text style={styles.noTimerText}>No active timer</Text>
-            <Text style={styles.infoText}>
-              Press the button below when the boss spawns to start tracking the next spawn window.
-            </Text>
-          </View>
-        ) : timeRemaining ? (
-          <View style={styles.timerContainer}>
-            <Text style={styles.statusLabel}>
-              {timeRemaining.inWindow ? 'BOSS CAN SPAWN!' : 'Window opens in:'}
-            </Text>
-            <Text style={[styles.timerText, timeRemaining.inWindow && styles.timerTextActive]}>
-              {formatTime(timeRemaining)}
-            </Text>
-            {timeRemaining.inWindow && (
-              <Text style={styles.windowInfo}>
-                Window closes in {timeRemaining.hours}h {timeRemaining.minutes}m
-              </Text>
-            )}
-          </View>
-        ) : (
-          <View style={styles.noTimerContainer}>
-            <Text style={styles.expiredText}>Spawn window has ended</Text>
-            <Text style={styles.infoText}>
-              Press the button below when the boss spawns again.
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, styles.primaryButton]}
-        onPress={handleBossSpawned}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.buttonText}>Boss Spawned!</Text>
-      </TouchableOpacity>
-
-      <View style={styles.settingsCard}>
-        <Text style={styles.settingsTitle}>Settings</Text>
-        
-        <TouchableOpacity
-          style={styles.settingRow}
-          onPress={toggleNotifications}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.settingLabel}>Enable Notifications</Text>
-          <View style={[styles.toggle, notificationsEnabled && styles.toggleActive]}>
-            <View style={[styles.toggleThumb, notificationsEnabled && styles.toggleThumbActive]} />
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.infoBox}>
-          <Text style={styles.infoBoxText}>
-            - Hourly notifications during 12-24hr window
+        <View style={styles.timerCard}>
+          <Text style={styles.timerLabel}>
+            {timeRemaining?.inWindow ? 'WINDOW CLOSES IN:' : 'WINDOW OPENS IN:'}
           </Text>
-          <Text style={styles.infoBoxText}>
-            - Every 15 minutes in the final hour
+          <Text style={styles.timerText}>
+            {timeRemaining ? formatTime(timeRemaining) : '00:00:00'}
           </Text>
         </View>
 
-        {lastSpawnTime && (
-          <TouchableOpacity
-            style={[styles.button, styles.dangerButton]}
-            onPress={resetTimer}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.buttonText}>Reset Timer</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.spawnButton}
+          onPress={handleBossSpawned}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.spawnButtonText}>Boss Spawned!</Text>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -382,171 +260,68 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
   },
-  contentContainer: {
-    paddingTop: Platform.OS === 'android' ? 48 : 20,
-    paddingHorizontal: 20,
-    paddingBottom: 120,
-  },
-  header: {
+  content: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 30,
+    paddingHorizontal: 24,
+    paddingTop: 40,
   },
   logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 16,
+    width: 200,
+    height: 200,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 24,
+    fontWeight: '600',
     color: colors.primary,
-    fontWeight: '600',
+    marginBottom: 60,
     textAlign: 'center',
   },
-  card: {
+  timerCard: {
+    width: '100%',
     backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.2)',
-    elevation: 4,
-    borderWidth: 1,
+    borderRadius: 20,
+    borderWidth: 2,
     borderColor: colors.primary,
-  },
-  noTimerContainer: {
+    padding: 40,
+    marginBottom: 40,
     alignItems: 'center',
-    paddingVertical: 20,
   },
-  noTimerText: {
-    fontSize: 20,
+  timerLabel: {
+    fontSize: 18,
     fontWeight: '600',
     color: colors.textSecondary,
-    marginBottom: 12,
-  },
-  expiredText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.highlight,
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  timerContainer: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  statusLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
+    marginBottom: 20,
     letterSpacing: 1,
   },
   timerText: {
-    fontSize: 56,
+    fontSize: 64,
     fontWeight: 'bold',
     color: colors.primary,
     fontVariant: ['tabular-nums'],
   },
-  timerTextActive: {
-    color: colors.accent,
-  },
-  windowInfo: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 12,
-  },
-  button: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  primaryButton: {
+  spawnButton: {
+    width: '100%',
     backgroundColor: colors.primary,
-    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.3)',
-    elevation: 4,
-  },
-  dangerButton: {
-    backgroundColor: colors.secondary,
-    marginTop: 16,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  settingsCard: {
-    backgroundColor: colors.card,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.2)',
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  settingsTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 16,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingVertical: 24,
     alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 16,
+    boxShadow: '0px 6px 20px rgba(220, 20, 60, 0.4)',
+    elevation: 8,
   },
-  settingLabel: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  toggle: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.textSecondary,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  toggleActive: {
-    backgroundColor: colors.accent,
-  },
-  toggleThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignSelf: 'flex-start',
-  },
-  toggleThumbActive: {
-    alignSelf: 'flex-end',
-  },
-  infoBox: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  infoBoxText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 4,
+  spawnButtonText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
 });
