@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +16,6 @@ import { colors } from '@/styles/commonStyles';
 
 export default function ProfileScreen() {
   const [notificationCount, setNotificationCount] = useState(0);
-  const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
 
   useEffect(() => {
     loadNotificationInfo();
@@ -23,29 +23,10 @@ export default function ProfileScreen() {
 
   const loadNotificationInfo = async () => {
     try {
-      const { status } = await Notifications.getPermissionsAsync();
-      setPermissionStatus(status);
-
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       setNotificationCount(scheduled.length);
     } catch (error) {
       console.error('Error loading notification info:', error);
-    }
-  };
-
-  const handleRequestPermissions = async () => {
-    try {
-      const { status } = await Notifications.requestPermissionsAsync();
-      setPermissionStatus(status);
-      
-      if (status === 'granted') {
-        Alert.alert('Success', 'Notification permissions granted!');
-      } else {
-        Alert.alert('Denied', 'Notification permissions were denied.');
-      }
-    } catch (error) {
-      console.error('Error requesting permissions:', error);
-      Alert.alert('Error', 'Failed to request permissions.');
     }
   };
 
@@ -98,67 +79,40 @@ export default function ProfileScreen() {
     );
   };
 
-  const getPermissionStatusColor = () => {
-    switch (permissionStatus) {
-      case 'granted':
-        return colors.accent;
-      case 'denied':
-        return colors.highlight;
-      default:
-        return colors.textSecondary;
-    }
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
+        <Image 
+          source={require('@/assets/images/ae56c5a2-88ea-4b5c-91a4-a5f22d06080b.webp')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>Settings</Text>
         <Text style={styles.subtitle}>Manage your boss timer preferences</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Notification Status</Text>
-        
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Permission Status:</Text>
-          <Text style={[styles.statusValue, { color: getPermissionStatusColor() }]}>
-            {permissionStatus.toUpperCase()}
-          </Text>
-        </View>
-
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Scheduled Notifications:</Text>
-          <Text style={styles.statusValue}>{notificationCount}</Text>
-        </View>
-
-        {permissionStatus !== 'granted' && (
-          <TouchableOpacity
-            style={[styles.button, styles.primaryButton]}
-            onPress={handleRequestPermissions}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.buttonText}>Request Permissions</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.card}>
         <Text style={styles.cardTitle}>About</Text>
         <Text style={styles.aboutText}>
-          Boss Timer helps you track contested boss spawns in your favorite online game.
+          Devils of Ascension Contested Timer helps you track contested boss spawns in your favorite online game.
         </Text>
         <Text style={styles.aboutText}>
           After a boss spawns, it can respawn between 12-24 hours later. This app will notify you:
         </Text>
         <View style={styles.bulletList}>
-          <Text style={styles.bulletText}>• Every hour during the 12-24 hour window</Text>
-          <Text style={styles.bulletText}>• Every 15 minutes in the final hour</Text>
+          <Text style={styles.bulletText}>- Every hour during the 12-24 hour window</Text>
+          <Text style={styles.bulletText}>- Every 15 minutes in the final hour</Text>
         </View>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Actions</Text>
         
+        <View style={styles.statusRow}>
+          <Text style={styles.statusLabel}>Scheduled Notifications:</Text>
+          <Text style={styles.statusValue}>{notificationCount}</Text>
+        </View>
+
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={handleClearAllNotifications}
@@ -177,7 +131,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Boss Timer v1.0.0</Text>
+        <Text style={styles.footerText}>Devils of Ascension v1.0.0</Text>
         <Text style={styles.footerText}>Made for gamers, by gamers</Text>
       </View>
     </ScrollView>
@@ -198,6 +152,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 16,
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -214,8 +173,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.2)',
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   cardTitle: {
     fontSize: 20,
@@ -230,6 +191,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.background,
+    marginBottom: 16,
   },
   statusLabel: {
     fontSize: 16,
@@ -238,7 +200,7 @@ const styles = StyleSheet.create({
   statusValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.primary,
   },
   aboutText: {
     fontSize: 14,
@@ -262,9 +224,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 12,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
   },
   secondaryButton: {
     backgroundColor: colors.secondary,

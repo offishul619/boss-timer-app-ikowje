@@ -2,14 +2,14 @@
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
 export const colors = {
-  background: '#f0f0f0',
-  text: '#333333',
-  textSecondary: '#777777',
-  primary: '#007AFF',
-  secondary: '#FF9500',
-  accent: '#4CD964',
-  card: '#FFFFFF',
-  highlight: '#FF3B30',
+  background: '#1a1a1a',
+  text: '#ffffff',
+  textSecondary: '#a0a0a0',
+  primary: '#dc143c',
+  secondary: '#8b0000',
+  accent: '#ff4444',
+  card: '#2a2a2a',
+  highlight: '#dc143c',
 };
 
 export const buttonStyles = StyleSheet.create({

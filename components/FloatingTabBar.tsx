@@ -109,16 +109,16 @@ export default function FloatingTabBar({
     blurContainer: {
       ...styles.blurContainer,
       borderWidth: 1.2,
-      borderColor: colors.textSecondary,
+      borderColor: colors.primary,
       ...Platform.select({
         ios: {
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backgroundColor: 'rgba(42, 42, 42, 0.9)',
         },
         android: {
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: 'rgba(42, 42, 42, 0.95)',
         },
         web: {
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: 'rgba(42, 42, 42, 0.95)',
           backdropFilter: 'blur(10px)',
         },
       }),
@@ -128,7 +128,7 @@ export default function FloatingTabBar({
     },
     indicator: {
       ...styles.indicator,
-      backgroundColor: 'rgba(0, 122, 255, 0.1)',
+      backgroundColor: 'rgba(220, 20, 60, 0.3)',
       width: `${tabWidthPercent}%` as `${number}%`,
     },
   };

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -291,8 +292,13 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
-        <Text style={styles.title}>Boss Timer</Text>
-        <Text style={styles.subtitle}>Track contested boss spawns</Text>
+        <Image 
+          source={require('@/assets/images/ae56c5a2-88ea-4b5c-91a4-a5f22d06080b.webp')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>Devils of Ascension</Text>
+        <Text style={styles.subtitle}>Contested Timer</Text>
       </View>
 
       <View style={styles.card}>
@@ -351,10 +357,10 @@ export default function HomeScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoBoxText}>
-            • Hourly notifications during 12-24hr window
+            - Hourly notifications during 12-24hr window
           </Text>
           <Text style={styles.infoBoxText}>
-            • Every 15 minutes in the final hour
+            - Every 15 minutes in the final hour
           </Text>
         </View>
 
@@ -367,12 +373,6 @@ export default function HomeScreen() {
             <Text style={styles.buttonText}>Reset Timer</Text>
           </TouchableOpacity>
         )}
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Permission Status: {permissionStatus}
-        </Text>
       </View>
     </ScrollView>
   );
@@ -392,23 +392,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 16,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
+    fontSize: 18,
+    color: colors.primary,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   card: {
     backgroundColor: colors.card,
     borderRadius: 16,
     padding: 24,
     marginBottom: 20,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.2)',
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   noTimerContainer: {
     alignItems: 'center',
@@ -467,9 +477,11 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: colors.primary,
+    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.3)',
+    elevation: 4,
   },
   dangerButton: {
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.secondary,
     marginTop: 16,
   },
   buttonText: {
@@ -482,8 +494,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 4px 12px rgba(220, 20, 60, 0.2)',
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   settingsTitle: {
     fontSize: 20,
@@ -534,13 +548,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 4,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  footerText: {
-    fontSize: 12,
-    color: colors.textSecondary,
   },
 });
