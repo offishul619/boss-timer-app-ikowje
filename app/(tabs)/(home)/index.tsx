@@ -266,11 +266,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 10,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 500,
+    height: 500,
     marginBottom: 24,
   },
   title: {
