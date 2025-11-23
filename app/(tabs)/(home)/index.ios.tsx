@@ -7,17 +7,12 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '@/styles/commonStyles';
-import { 
-  initializePushNotifications, 
-  sendBossSpawnNotification,
-  isSupabaseConfigured 
-} from '@/services/pushNotificationService';
 
+// Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -43,8 +38,6 @@ export default function HomeScreen() {
   const [lastSpawnTime, setLastSpawnTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [isSendingNotification, setIsSendingNotification] = useState(false);
-  const [supabaseEnabled, setSupabaseEnabled] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -59,33 +52,10 @@ export default function HomeScreen() {
     }
   }, [lastSpawnTime]);
 
-  useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received:', notification);
-      const data = notification.request.content.data;
-      
-      if (data?.type === 'boss_spawn' && data?.timestamp) {
-        const spawnTime = new Date(data.timestamp).getTime();
-        handleRemoteBossSpawn(spawnTime);
-      }
-    });
-
-    return () => subscription.remove();
-  }, []);
-
   const initializeApp = async () => {
     await requestNotificationPermissions();
     await loadLastSpawnTime();
     await loadNotificationSettings();
-    
-    const configured = isSupabaseConfigured();
-    setSupabaseEnabled(configured);
-    
-    if (configured) {
-      await initializePushNotifications();
-    } else {
-      console.log('Supabase not configured. Push notifications will only work locally.');
-    }
   };
 
   const requestNotificationPermissions = async () => {
@@ -162,27 +132,7 @@ export default function HomeScreen() {
     }
   };
 
-  const handleRemoteBossSpawn = async (spawnTime: number) => {
-    setLastSpawnTime(spawnTime);
-    
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, spawnTime.toString());
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      
-      if (notificationsEnabled) {
-        await scheduleNotifications(spawnTime);
-      }
-      
-      console.log('Remote boss spawn processed');
-    } catch (error) {
-      console.error('Error handling remote boss spawn:', error);
-    }
-  };
-
   const handleBossSpawned = async () => {
-    if (isSendingNotification) return;
-    
-    setIsSendingNotification(true);
     const now = Date.now();
     setLastSpawnTime(now);
     
@@ -194,30 +144,10 @@ export default function HomeScreen() {
         await scheduleNotifications(now);
       }
       
-      if (supabaseEnabled) {
-        const success = await sendBossSpawnNotification();
-        if (success) {
-          Alert.alert(
-            'Boss Spawned!', 
-            'Timer started. All users have been notified!'
-          );
-        } else {
-          Alert.alert(
-            'Boss Spawned!', 
-            'Timer started. Local notifications scheduled, but failed to notify other users.'
-          );
-        }
-      } else {
-        Alert.alert(
-          'Boss Spawned!', 
-          'Timer started. Notifications scheduled.\n\nNote: To notify all users, please enable Supabase in the Natively interface.'
-        );
-      }
+      Alert.alert('Boss Spawned!', 'Timer started. Notifications scheduled.');
     } catch (error) {
       console.error('Error handling boss spawn:', error);
       Alert.alert('Error', 'Failed to save spawn time.');
-    } finally {
-      setIsSendingNotification(false);
     }
   };
 
@@ -291,14 +221,6 @@ export default function HomeScreen() {
         <Text style={styles.title}>Devils of Ascension</Text>
         <Text style={styles.subtitle}>Contested Timer</Text>
 
-        {!supabaseEnabled && (
-          <View style={styles.warningBanner}>
-            <Text style={styles.warningText}>
-              ⚠️ Supabase not enabled. Push notifications will only work locally.
-            </Text>
-          </View>
-        )}
-
         <View style={styles.timerCard}>
           <Text style={styles.timerLabel}>
             {timeRemaining?.inWindow ? 'WINDOW CLOSES IN:' : 'WINDOW OPENS IN:'}
@@ -309,16 +231,11 @@ export default function HomeScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.spawnButton, isSendingNotification && styles.spawnButtonDisabled]}
+          style={styles.spawnButton}
           onPress={handleBossSpawned}
           activeOpacity={0.8}
-          disabled={isSendingNotification}
         >
-          {isSendingNotification ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.spawnButtonText}>Boss Spawned!</Text>
-          )}
+          <Text style={styles.spawnButtonText}>Boss Spawned!</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -352,23 +269,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600',
     color: colors.primary,
-    marginBottom: 20,
+    marginBottom: 60,
     textAlign: 'center',
-  },
-  warningBanner: {
-    backgroundColor: 'rgba(255, 152, 0, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 152, 0, 0.4)',
-  },
-  warningText: {
-    color: '#FFA500',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '600',
   },
   timerCard: {
     width: '100%',
@@ -404,9 +306,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 8,
-  },
-  spawnButtonDisabled: {
-    opacity: 0.6,
   },
   spawnButtonText: {
     fontSize: 24,
