@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,13 @@ import {
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '@/styles/commonStyles';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  reportBossSpawn,
+  getLatestBossSpawn,
+  subscribeToSpawnUpdates,
+  unsubscribeFromSpawnUpdates,
+} from '@/services/bossTimerService';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -25,7 +32,6 @@ const STORAGE_KEY = '@boss_timer_last_spawn';
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 const ONE_HOUR = 60 * 60 * 1000;
-const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 interface TimeRemaining {
   hours: number;
@@ -37,7 +43,8 @@ interface TimeRemaining {
 export default function HomeScreen() {
   const [lastSpawnTime, setLastSpawnTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const requestNotificationPermissions = async () => {
     try {
@@ -63,25 +70,22 @@ export default function HomeScreen() {
 
   const loadLastSpawnTime = async () => {
     try {
+      // First try to get from local storage
       const savedTime = await AsyncStorage.getItem(STORAGE_KEY);
       if (savedTime) {
         const time = parseInt(savedTime, 10);
         setLastSpawnTime(time);
         updateTimeRemaining(time);
       }
-    } catch (error) {
-      console.error('Error loading last spawn time:', error);
-    }
-  };
 
-  const loadNotificationSettings = async () => {
-    try {
-      const enabled = await AsyncStorage.getItem('@notifications_enabled');
-      if (enabled !== null) {
-        setNotificationsEnabled(enabled === 'true');
+      // Then fetch the latest from database to ensure sync
+      const latestSpawn = await getLatestBossSpawn();
+      if (latestSpawn && latestSpawn !== parseInt(savedTime || '0', 10)) {
+        setLastSpawnTime(latestSpawn);
+        updateTimeRemaining(latestSpawn);
       }
     } catch (error) {
-      console.error('Error loading notification settings:', error);
+      console.error('Error loading last spawn time:', error);
     }
   };
 
@@ -113,14 +117,32 @@ export default function HomeScreen() {
     }
   }, [lastSpawnTime]);
 
+  const handleSpawnUpdate = useCallback((spawnTime: number) => {
+    console.log('Received spawn update:', spawnTime);
+    setLastSpawnTime(spawnTime);
+    updateTimeRemaining(spawnTime);
+  }, [updateTimeRemaining]);
+
   const initializeApp = useCallback(async () => {
     await requestNotificationPermissions();
     await loadLastSpawnTime();
-    await loadNotificationSettings();
-  }, []);
+
+    // Subscribe to real-time updates
+    if (!channelRef.current) {
+      channelRef.current = subscribeToSpawnUpdates(handleSpawnUpdate);
+    }
+  }, [handleSpawnUpdate]);
 
   useEffect(() => {
     initializeApp();
+
+    // Cleanup on unmount
+    return () => {
+      if (channelRef.current) {
+        unsubscribeFromSpawnUpdates(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [initializeApp]);
 
   useEffect(() => {
@@ -132,75 +154,29 @@ export default function HomeScreen() {
     }
   }, [lastSpawnTime, updateTimeRemaining]);
 
-  const scheduleNotifications = async (spawnTime: number) => {
-    try {
-      const now = Date.now();
-
-      for (let i = 12; i < 24; i++) {
-        const notificationTime = spawnTime + (i * ONE_HOUR);
-        
-        if (notificationTime > now) {
-          const hoursLeft = 24 - i;
-          
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Boss Spawn Alert',
-              body: `Boss can spawn! ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} left in window.`,
-              sound: 'default',
-            },
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
-              date: new Date(notificationTime),
-            },
-          });
-        }
-      }
-
-      const lastHourStart = spawnTime + (23 * ONE_HOUR);
-      if (lastHourStart > now) {
-        for (let i = 0; i < 4; i++) {
-          const notificationTime = lastHourStart + (i * FIFTEEN_MINUTES);
-          
-          if (notificationTime > now) {
-            const minutesLeft = 60 - (i * 15);
-            
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: 'Boss Spawn Alert - Final Hour!',
-                body: `Boss can spawn! Only ${minutesLeft} minutes left in window!`,
-                sound: 'default',
-              },
-              trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.DATE,
-                date: new Date(notificationTime),
-              },
-            });
-          }
-        }
-      }
-
-      console.log('Notifications scheduled successfully');
-    } catch (error) {
-      console.error('Error scheduling notifications:', error);
-    }
-  };
-
   const handleBossSpawned = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
     const now = Date.now();
-    setLastSpawnTime(now);
     
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, now.toString());
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      const success = await reportBossSpawn(now);
       
-      if (notificationsEnabled) {
-        await scheduleNotifications(now);
+      if (success) {
+        setLastSpawnTime(now);
+        Alert.alert(
+          'Boss Spawned!',
+          'All users have been notified! Timer started and notifications scheduled.'
+        );
+      } else {
+        Alert.alert('Error', 'Failed to report boss spawn. Please try again.');
       }
-      
-      Alert.alert('Boss Spawned!', 'Timer started. Notifications scheduled.');
     } catch (error) {
       console.error('Error handling boss spawn:', error);
-      Alert.alert('Error', 'Failed to save spawn time.');
+      Alert.alert('Error', 'Failed to report boss spawn. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -228,11 +204,14 @@ export default function HomeScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.spawnButton}
+          style={[styles.spawnButton, isSubmitting && styles.spawnButtonDisabled]}
           onPress={handleBossSpawned}
           activeOpacity={0.8}
+          disabled={isSubmitting}
         >
-          <Text style={styles.spawnButtonText}>Boss Spawned!</Text>
+          <Text style={styles.spawnButtonText}>
+            {isSubmitting ? 'Notifying All Users...' : 'Boss Spawned!'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -289,6 +268,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 8,
+  },
+  spawnButtonDisabled: {
+    opacity: 0.6,
   },
   spawnButtonText: {
     fontSize: 24,
