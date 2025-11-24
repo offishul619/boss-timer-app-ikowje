@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -210,6 +211,12 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Image 
+        source={require('../../../assets/images/a9113830-9f44-4312-b6c0-0804db9c58e6.webp')} 
+        style={styles.bannerImage}
+        resizeMode="cover"
+      />
+      
       <View style={styles.content}>
         <View style={styles.timerCard}>
           <Text style={styles.timerLabel}>
@@ -236,6 +243,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  bannerImage: {
+    width: '100%',
+    height: 250,
+    marginTop: 0,
   },
   content: {
     flex: 1,
