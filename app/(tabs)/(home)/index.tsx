@@ -236,13 +236,14 @@ const styles = StyleSheet.create({
   bannerImage: {
     width: '100%',
     height: 250,
-    marginTop: 20,
+    marginTop: 50,
   },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    marginTop: -50,
   },
   timerCard: {
     width: '100%',
