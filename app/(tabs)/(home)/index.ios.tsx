@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -37,25 +37,6 @@ export default function HomeScreen() {
   const [lastSpawnTime, setLastSpawnTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-
-  useEffect(() => {
-    initializeApp();
-  }, []);
-
-  useEffect(() => {
-    if (lastSpawnTime) {
-      const interval = setInterval(() => {
-        updateTimeRemaining();
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [lastSpawnTime]);
-
-  const initializeApp = async () => {
-    await requestNotificationPermissions();
-    await loadLastSpawnTime();
-    await loadNotificationSettings();
-  };
 
   const requestNotificationPermissions = async () => {
     try {
@@ -103,7 +84,7 @@ export default function HomeScreen() {
     }
   };
 
-  const updateTimeRemaining = (spawnTime?: number) => {
+  const updateTimeRemaining = useCallback((spawnTime?: number) => {
     const time = spawnTime || lastSpawnTime;
     if (!time) return;
 
@@ -129,26 +110,26 @@ export default function HomeScreen() {
     } else {
       setTimeRemaining(null);
     }
-  };
+  }, [lastSpawnTime]);
 
-  const handleBossSpawned = async () => {
-    const now = Date.now();
-    setLastSpawnTime(now);
-    
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, now.toString());
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      
-      if (notificationsEnabled) {
-        await scheduleNotifications(now);
-      }
-      
-      Alert.alert('Boss Spawned!', 'Timer started. Notifications scheduled.');
-    } catch (error) {
-      console.error('Error handling boss spawn:', error);
-      Alert.alert('Error', 'Failed to save spawn time.');
+  const initializeApp = useCallback(async () => {
+    await requestNotificationPermissions();
+    await loadLastSpawnTime();
+    await loadNotificationSettings();
+  }, []);
+
+  useEffect(() => {
+    initializeApp();
+  }, [initializeApp]);
+
+  useEffect(() => {
+    if (lastSpawnTime) {
+      const interval = setInterval(() => {
+        updateTimeRemaining();
+      }, 1000);
+      return () => clearInterval(interval);
     }
-  };
+  }, [lastSpawnTime, updateTimeRemaining]);
 
   const scheduleNotifications = async (spawnTime: number) => {
     try {
@@ -200,6 +181,25 @@ export default function HomeScreen() {
       console.log('Notifications scheduled successfully');
     } catch (error) {
       console.error('Error scheduling notifications:', error);
+    }
+  };
+
+  const handleBossSpawned = async () => {
+    const now = Date.now();
+    setLastSpawnTime(now);
+    
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, now.toString());
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      
+      if (notificationsEnabled) {
+        await scheduleNotifications(now);
+      }
+      
+      Alert.alert('Boss Spawned!', 'Timer started. Notifications scheduled.');
+    } catch (error) {
+      console.error('Error handling boss spawn:', error);
+      Alert.alert('Error', 'Failed to save spawn time.');
     }
   };
 
