@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -212,15 +211,6 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Image 
-          source={require('@/assets/images/4f3bc69d-9004-4977-8c4d-af99dd8316c5.webp')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        
-        <Text style={styles.title}>Devils of Ascension</Text>
-        <Text style={styles.subtitle}>Contested Timer</Text>
-
         <View style={styles.timerCard}>
           <Text style={styles.timerLabel}>
             {timeRemaining?.inWindow ? 'WINDOW CLOSES IN:' : 'WINDOW OPENS IN:'}
@@ -250,27 +240,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 15,
-  },
-  logo: {
-    width: 500,
-    height: 500,
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: colors.primary,
-    marginBottom: 60,
-    textAlign: 'center',
   },
   timerCard: {
     width: '100%',
