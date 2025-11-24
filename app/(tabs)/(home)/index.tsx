@@ -20,7 +20,6 @@ import {
   unsubscribeFromSpawnUpdates,
 } from '@/services/bossTimerService';
 
-// Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -45,6 +44,7 @@ export default function HomeScreen() {
   const [lastSpawnTime, setLastSpawnTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('connecting');
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const requestNotificationPermissions = async () => {
@@ -59,6 +59,10 @@ export default function HomeScreen() {
 
       if (finalStatus !== 'granted') {
         console.log('Notification permissions not granted');
+        Alert.alert(
+          'Notifications Disabled',
+          'Please enable notifications to receive boss spawn alerts.'
+        );
         return false;
       }
 
@@ -71,6 +75,7 @@ export default function HomeScreen() {
         });
       }
 
+      console.log('Notification permissions granted');
       return true;
     } catch (error) {
       console.error('Error requesting notification permissions:', error);
@@ -80,10 +85,13 @@ export default function HomeScreen() {
 
   const loadLastSpawnTime = async () => {
     try {
+      console.log('Loading last spawn time...');
+      
       // First try to get from local storage
       const savedTime = await AsyncStorage.getItem(STORAGE_KEY);
       if (savedTime) {
         const time = parseInt(savedTime, 10);
+        console.log('Found saved spawn time:', time);
         setLastSpawnTime(time);
         updateTimeRemaining(time);
       }
@@ -91,6 +99,7 @@ export default function HomeScreen() {
       // Then fetch the latest from database to ensure sync
       const latestSpawn = await getLatestBossSpawn();
       if (latestSpawn && latestSpawn !== parseInt(savedTime || '0', 10)) {
+        console.log('Database has newer spawn time:', latestSpawn);
         setLastSpawnTime(latestSpawn);
         updateTimeRemaining(latestSpawn);
       }
@@ -128,29 +137,49 @@ export default function HomeScreen() {
   }, [lastSpawnTime]);
 
   const handleSpawnUpdate = useCallback((spawnTime: number) => {
-    console.log('Received spawn update:', spawnTime);
+    console.log('UI received spawn update:', spawnTime);
     setLastSpawnTime(spawnTime);
     updateTimeRemaining(spawnTime);
   }, [updateTimeRemaining]);
 
   const initializeApp = useCallback(async () => {
+    console.log('Initializing app...');
+    
     await requestNotificationPermissions();
     await loadLastSpawnTime();
 
     // Subscribe to real-time updates
     if (!channelRef.current) {
-      channelRef.current = subscribeToSpawnUpdates(handleSpawnUpdate);
+      console.log('Creating realtime subscription...');
+      const channel = subscribeToSpawnUpdates(handleSpawnUpdate);
+      channelRef.current = channel;
+      
+      // Monitor connection status
+      const checkStatus = () => {
+        if (channelRef.current) {
+          const state = channelRef.current.state;
+          setConnectionStatus(state);
+          console.log('Channel state:', state);
+        }
+      };
+      
+      checkStatus();
+      const statusInterval = setInterval(checkStatus, 5000);
+      
+      return () => clearInterval(statusInterval);
     }
   }, [handleSpawnUpdate]);
 
   useEffect(() => {
-    initializeApp();
+    const cleanup = initializeApp();
 
-    // Cleanup on unmount
     return () => {
       if (channelRef.current) {
         unsubscribeFromSpawnUpdates(channelRef.current);
         channelRef.current = null;
+      }
+      if (cleanup) {
+        cleanup.then(fn => fn && fn());
       }
     };
   }, [initializeApp]);
@@ -165,26 +194,39 @@ export default function HomeScreen() {
   }, [lastSpawnTime, updateTimeRemaining]);
 
   const handleBossSpawned = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting) {
+      console.log('Already submitting, ignoring click');
+      return;
+    }
 
+    console.log('Boss spawned button pressed!');
     setIsSubmitting(true);
     const now = Date.now();
     
     try {
+      console.log('Calling reportBossSpawn...');
       const success = await reportBossSpawn(now);
       
       if (success) {
+        console.log('Boss spawn reported successfully!');
         setLastSpawnTime(now);
         Alert.alert(
           'Boss Spawned!',
           'All users have been notified! Timer started and notifications scheduled.'
         );
       } else {
-        Alert.alert('Error', 'Failed to report boss spawn. Please try again.');
+        console.error('reportBossSpawn returned false');
+        Alert.alert(
+          'Error',
+          'Failed to report boss spawn. Please check your connection and try again.'
+        );
       }
     } catch (error) {
-      console.error('Error handling boss spawn:', error);
-      Alert.alert('Error', 'Failed to report boss spawn. Please try again.');
+      console.error('Exception handling boss spawn:', error);
+      Alert.alert(
+        'Error',
+        'An error occurred while reporting the boss spawn. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -211,6 +253,11 @@ export default function HomeScreen() {
           <Text style={styles.timerText}>
             {timeRemaining ? formatTime(timeRemaining) : '00:00:00'}
           </Text>
+          {__DEV__ && (
+            <Text style={styles.debugText}>
+              Status: {connectionStatus}
+            </Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -267,6 +314,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.primary,
     fontVariant: ['tabular-nums'],
+  },
+  debugText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 10,
   },
   spawnButton: {
     width: '100%',
