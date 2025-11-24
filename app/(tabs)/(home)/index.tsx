@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   Image,
+  ImageBackground,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -238,47 +239,62 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Image 
-        source={require('../../../assets/images/a9113830-9f44-4312-b6c0-0804db9c58e6.webp')} 
-        style={styles.bannerImage}
-        resizeMode="cover"
-      />
-      
-      <View style={styles.content}>
-        <View style={styles.timerCard}>
-          <Text style={styles.timerLabel}>
-            {timeRemaining?.inWindow ? 'WINDOW CLOSES IN:' : 'WINDOW OPENS IN:'}
-          </Text>
-          <Text style={styles.timerText}>
-            {timeRemaining ? formatTime(timeRemaining) : '00:00:00'}
-          </Text>
-          {__DEV__ && (
-            <Text style={styles.debugText}>
-              Status: {connectionStatus}
+    <ImageBackground 
+      source={require('../../../assets/images/a17016b3-d794-4f1e-bc67-b15e1c0e1bd5.jpeg')} 
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <View style={styles.overlay} />
+      <View style={styles.container}>
+        <Image 
+          source={require('../../../assets/images/a9113830-9f44-4312-b6c0-0804db9c58e6.webp')} 
+          style={styles.bannerImage}
+          resizeMode="cover"
+        />
+        
+        <View style={styles.content}>
+          <View style={styles.timerCard}>
+            <Text style={styles.timerLabel}>
+              {timeRemaining?.inWindow ? 'WINDOW CLOSES IN:' : 'WINDOW OPENS IN:'}
             </Text>
-          )}
-        </View>
+            <Text style={styles.timerText}>
+              {timeRemaining ? formatTime(timeRemaining) : '00:00:00'}
+            </Text>
+            {__DEV__ && (
+              <Text style={styles.debugText}>
+                Status: {connectionStatus}
+              </Text>
+            )}
+          </View>
 
-        <TouchableOpacity
-          style={[styles.spawnButton, isSubmitting && styles.spawnButtonDisabled]}
-          onPress={handleBossSpawned}
-          activeOpacity={0.8}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.spawnButtonText}>
-            {isSubmitting ? 'Notifying All Users...' : 'Boss Spawned!'}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.spawnButton, isSubmitting && styles.spawnButtonDisabled]}
+            onPress={handleBossSpawned}
+            activeOpacity={0.8}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.spawnButtonText}>
+              {isSubmitting ? 'Notifying All Users...' : 'Boss Spawned!'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   bannerImage: {
     width: '100%',
@@ -294,7 +310,7 @@ const styles = StyleSheet.create({
   },
   timerCard: {
     width: '100%',
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(26, 26, 46, 0.85)',
     borderRadius: 20,
     borderWidth: 2,
     borderColor: colors.primary,
