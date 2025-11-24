@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   bannerImage: {
     width: '100%',
     height: 250,
-    marginTop: 0,
+    marginTop: 20,
   },
   content: {
     flex: 1,
