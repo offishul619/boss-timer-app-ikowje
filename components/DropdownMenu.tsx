@@ -65,6 +65,22 @@ export default function DropdownMenu() {
 
             <TouchableOpacity
               style={styles.menuItem}
+              onPress={() => handleNavigate('/(tabs)/guild-events')}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="calendar"
+                android_material_icon_name="event"
+                size={20}
+                color={colors.text}
+              />
+              <Text style={styles.menuItemText}>Guild Events</Text>
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => handleNavigate('/(tabs)/settings')}
               activeOpacity={0.7}
             >

@@ -12,6 +12,12 @@ export default function TabLayout() {
       label: 'Timer',
     },
     {
+      name: 'guild-events',
+      route: '/(tabs)/guild-events',
+      icon: 'event',
+      label: 'Events',
+    },
+    {
       name: 'settings',
       route: '/(tabs)/settings',
       icon: 'settings',
@@ -28,6 +34,7 @@ export default function TabLayout() {
         }}
       >
         <Stack.Screen key="home" name="(home)" />
+        <Stack.Screen key="guild-events" name="guild-events" />
         <Stack.Screen key="settings" name="settings" />
         <Stack.Screen key="profile" name="profile" />
       </Stack>

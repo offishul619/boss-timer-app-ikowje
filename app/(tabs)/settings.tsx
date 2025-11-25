@@ -14,10 +14,12 @@ import DropdownMenu from '@/components/DropdownMenu';
 
 const REMINDER_NOTIFICATIONS_KEY = '@reminder_notifications_enabled';
 const BOSS_SPAWN_NOTIFICATIONS_KEY = '@boss_spawn_notifications_enabled';
+const GUILD_EVENT_NOTIFICATIONS_KEY = '@guild_event_notifications_enabled';
 
 export default function SettingsScreen() {
   const [reminderNotificationsEnabled, setReminderNotificationsEnabled] = useState(true);
   const [bossSpawnNotificationsEnabled, setBossSpawnNotificationsEnabled] = useState(true);
+  const [guildEventNotificationsEnabled, setGuildEventNotificationsEnabled] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -27,12 +29,16 @@ export default function SettingsScreen() {
     try {
       const reminderSetting = await AsyncStorage.getItem(REMINDER_NOTIFICATIONS_KEY);
       const bossSpawnSetting = await AsyncStorage.getItem(BOSS_SPAWN_NOTIFICATIONS_KEY);
+      const guildEventSetting = await AsyncStorage.getItem(GUILD_EVENT_NOTIFICATIONS_KEY);
 
       if (reminderSetting !== null) {
         setReminderNotificationsEnabled(reminderSetting === 'true');
       }
       if (bossSpawnSetting !== null) {
         setBossSpawnNotificationsEnabled(bossSpawnSetting === 'true');
+      }
+      if (guildEventSetting !== null) {
+        setGuildEventNotificationsEnabled(guildEventSetting === 'true');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -56,6 +62,16 @@ export default function SettingsScreen() {
       console.log('Boss spawn notifications:', value ? 'enabled' : 'disabled');
     } catch (error) {
       console.error('Error saving boss spawn notification setting:', error);
+    }
+  };
+
+  const handleGuildEventToggle = async (value: boolean) => {
+    try {
+      setGuildEventNotificationsEnabled(value);
+      await AsyncStorage.setItem(GUILD_EVENT_NOTIFICATIONS_KEY, value.toString());
+      console.log('Guild event notifications:', value ? 'enabled' : 'disabled');
+    } catch (error) {
+      console.error('Error saving guild event notification setting:', error);
     }
   };
 
@@ -102,6 +118,22 @@ export default function SettingsScreen() {
             <Switch
               value={bossSpawnNotificationsEnabled}
               onValueChange={handleBossSpawnToggle}
+              trackColor={{ false: colors.textSecondary, true: colors.primary }}
+              thumbColor={Platform.OS === 'ios' ? undefined : colors.text}
+              ios_backgroundColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingLabel}>Guild Event Notifications</Text>
+              <Text style={styles.settingDescription}>
+                Receive reminders 1 hour before guild events
+              </Text>
+            </View>
+            <Switch
+              value={guildEventNotificationsEnabled}
+              onValueChange={handleGuildEventToggle}
               trackColor={{ false: colors.textSecondary, true: colors.primary }}
               thumbColor={Platform.OS === 'ios' ? undefined : colors.text}
               ios_backgroundColor={colors.textSecondary}
