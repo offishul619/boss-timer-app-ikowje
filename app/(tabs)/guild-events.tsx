@@ -337,24 +337,52 @@ export default function GuildEventsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('Deleting event:', eventId);
-              const { error } = await supabase
+              console.log('Attempting to delete event with ID:', eventId);
+              
+              // First, verify the event exists
+              const { data: existingEvent, error: fetchError } = await supabase
+                .from('guild_events')
+                .select('*')
+                .eq('id', eventId)
+                .single();
+
+              if (fetchError) {
+                console.error('Error fetching event before delete:', fetchError);
+                Alert.alert('Error', `Could not find event: ${fetchError.message}`);
+                return;
+              }
+
+              console.log('Event found, proceeding with delete:', existingEvent);
+
+              // Now delete the event
+              const { data, error, status, statusText } = await supabase
                 .from('guild_events')
                 .delete()
-                .eq('id', eventId);
+                .eq('id', eventId)
+                .select();
+
+              console.log('Delete response:', { data, error, status, statusText });
 
               if (error) {
                 console.error('Error deleting guild event:', error);
+                console.error('Error details:', JSON.stringify(error, null, 2));
                 Alert.alert('Error', `Failed to delete event: ${error.message}`);
                 return;
               }
 
-              console.log('Event deleted successfully');
+              console.log('Event deleted successfully, data:', data);
+              
+              // Update local state immediately
+              setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+              
               Alert.alert('Success', 'Event deleted successfully!');
+              
+              // Reload events to ensure consistency
               await loadEvents();
             } catch (error) {
               console.error('Exception deleting guild event:', error);
-              Alert.alert('Error', 'An error occurred while deleting the event.');
+              console.error('Exception details:', JSON.stringify(error, null, 2));
+              Alert.alert('Error', 'An unexpected error occurred while deleting the event.');
             }
           },
         },
@@ -679,7 +707,7 @@ export default function GuildEventsScreen() {
                         ios_icon_name="trash"
                         android_material_icon_name="delete"
                         size={20}
-                        color={colors.textSecondary}
+                        color="#FF3B30"
                       />
                     </TouchableOpacity>
                   </View>
