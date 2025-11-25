@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Boss Timer",
@@ -39,10 +40,6 @@
     "scheme": "natively",
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "router": {}
     }
-  },
-  "scheme": "Boss Timer"
+  }
 }
