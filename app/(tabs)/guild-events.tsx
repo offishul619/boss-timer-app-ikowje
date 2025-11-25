@@ -326,68 +326,82 @@ export default function GuildEventsScreen() {
     setShowEditModal(true);
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
+  const confirmDeleteEvent = (eventId: string, eventName: string) => {
+    console.log('confirmDeleteEvent called with ID:', eventId);
     Alert.alert(
       'Delete Event',
-      'Are you sure you want to delete this event?',
+      `Are you sure you want to delete "${eventName}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => console.log('Delete cancelled')
+        },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('Attempting to delete event with ID:', eventId);
-              
-              // First, verify the event exists
-              const { data: existingEvent, error: fetchError } = await supabase
-                .from('guild_events')
-                .select('*')
-                .eq('id', eventId)
-                .single();
-
-              if (fetchError) {
-                console.error('Error fetching event before delete:', fetchError);
-                Alert.alert('Error', `Could not find event: ${fetchError.message}`);
-                return;
-              }
-
-              console.log('Event found, proceeding with delete:', existingEvent);
-
-              // Now delete the event
-              const { data, error, status, statusText } = await supabase
-                .from('guild_events')
-                .delete()
-                .eq('id', eventId)
-                .select();
-
-              console.log('Delete response:', { data, error, status, statusText });
-
-              if (error) {
-                console.error('Error deleting guild event:', error);
-                console.error('Error details:', JSON.stringify(error, null, 2));
-                Alert.alert('Error', `Failed to delete event: ${error.message}`);
-                return;
-              }
-
-              console.log('Event deleted successfully, data:', data);
-              
-              // Update local state immediately
-              setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
-              
-              Alert.alert('Success', 'Event deleted successfully!');
-              
-              // Reload events to ensure consistency
-              await loadEvents();
-            } catch (error) {
-              console.error('Exception deleting guild event:', error);
-              console.error('Exception details:', JSON.stringify(error, null, 2));
-              Alert.alert('Error', 'An unexpected error occurred while deleting the event.');
-            }
+          onPress: () => {
+            console.log('Delete confirmed, calling handleDeleteEvent');
+            handleDeleteEvent(eventId);
           },
         },
-      ]
+      ],
+      { cancelable: true }
     );
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      console.log('=== Starting delete operation ===');
+      console.log('Attempting to delete event with ID:', eventId);
+      
+      // First, verify the event exists
+      const { data: existingEvent, error: fetchError } = await supabase
+        .from('guild_events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching event before delete:', fetchError);
+        Alert.alert('Error', `Could not find event: ${fetchError.message}`);
+        return;
+      }
+
+      console.log('Event found, proceeding with delete:', existingEvent);
+
+      // Now delete the event
+      const { data, error, status, statusText } = await supabase
+        .from('guild_events')
+        .delete()
+        .eq('id', eventId)
+        .select();
+
+      console.log('Delete response:', { data, error, status, statusText });
+
+      if (error) {
+        console.error('Error deleting guild event:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        Alert.alert('Error', `Failed to delete event: ${error.message}`);
+        return;
+      }
+
+      console.log('Event deleted successfully, data:', data);
+      
+      // Update local state immediately
+      setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+      
+      Alert.alert('Success', 'Event deleted successfully!');
+      
+      // Reload events to ensure consistency
+      await loadEvents();
+      
+      console.log('=== Delete operation completed ===');
+    } catch (error) {
+      console.error('Exception deleting guild event:', error);
+      console.error('Exception details:', JSON.stringify(error, null, 2));
+      Alert.alert('Error', 'An unexpected error occurred while deleting the event.');
+    }
   };
 
   const formatEventDateTime = (timestamp: number): string => {
@@ -687,7 +701,10 @@ export default function GuildEventsScreen() {
                   </View>
                   <View style={styles.eventActions}>
                     <TouchableOpacity
-                      onPress={() => openEditModal(event)}
+                      onPress={() => {
+                        console.log('Edit button pressed for event:', event.id);
+                        openEditModal(event);
+                      }}
                       style={styles.actionButton}
                       activeOpacity={0.7}
                     >
@@ -699,7 +716,10 @@ export default function GuildEventsScreen() {
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      onPress={() => handleDeleteEvent(event.id)}
+                      onPress={() => {
+                        console.log('Delete button pressed for event:', event.id, event.event_name);
+                        confirmDeleteEvent(event.id, event.event_name);
+                      }}
                       style={styles.actionButton}
                       activeOpacity={0.7}
                     >
@@ -913,7 +933,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   eventFooter: {
     flexDirection: 'row',
