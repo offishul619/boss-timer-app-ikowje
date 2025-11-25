@@ -31,6 +31,8 @@ interface GuildEvent {
 export default function GuildEventsScreen() {
   const [events, setEvents] = useState<GuildEvent[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<GuildEvent | null>(null);
   const [eventName, setEventName] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
@@ -232,6 +234,98 @@ export default function GuildEventsScreen() {
     }
   };
 
+  const handleEditEvent = async () => {
+    if (!editingEvent) return;
+
+    if (!eventName.trim()) {
+      Alert.alert('Error', 'Please enter an event name');
+      return;
+    }
+
+    // Determine which date to use
+    let dateToUse = selectedDate;
+    if (useManualDate && manualDateInput.trim()) {
+      const parsedDate = parseManualDate(manualDateInput);
+      if (!parsedDate) {
+        Alert.alert('Error', 'Invalid date format. Please use MM/DD/YYYY');
+        return;
+      }
+      dateToUse = parsedDate;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const eventDateTime = convertToEasternTime(dateToUse, selectedTime);
+      const now = Date.now();
+
+      if (eventDateTime <= now) {
+        Alert.alert('Error', 'Event date and time must be in the future');
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('Updating guild event:', {
+        id: editingEvent.id,
+        event_name: eventName,
+        event_date_time: eventDateTime,
+      });
+
+      const { data, error } = await supabase
+        .from('guild_events')
+        .update({
+          event_name: eventName,
+          event_date_time: eventDateTime,
+        })
+        .eq('id', editingEvent.id)
+        .select();
+
+      if (error) {
+        console.error('Error updating guild event:', error);
+        Alert.alert('Error', `Failed to update event: ${error.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('Guild event updated successfully:', data);
+
+      // Schedule notification
+      await scheduleEventNotification(eventName, eventDateTime);
+
+      // Reset form
+      setEventName('');
+      setSelectedDate(new Date());
+      setSelectedTime(new Date());
+      setManualDateInput('');
+      setUseManualDate(false);
+      setEditingEvent(null);
+      setShowEditModal(false);
+      
+      Alert.alert('Success', 'Guild event updated successfully!');
+      
+      // Reload events
+      await loadEvents();
+    } catch (error) {
+      console.error('Exception updating guild event:', error);
+      Alert.alert('Error', 'An error occurred while updating the event.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openEditModal = (event: GuildEvent) => {
+    setEditingEvent(event);
+    setEventName(event.event_name);
+    
+    const eventDate = new Date(event.event_date_time);
+    setSelectedDate(eventDate);
+    setSelectedTime(eventDate);
+    setManualDateInput('');
+    setUseManualDate(false);
+    
+    setShowEditModal(true);
+  };
+
   const handleDeleteEvent = async (eventId: string) => {
     Alert.alert(
       'Delete Event',
@@ -243,6 +337,7 @@ export default function GuildEventsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('Deleting event:', eventId);
               const { error } = await supabase
                 .from('guild_events')
                 .delete()
@@ -250,13 +345,16 @@ export default function GuildEventsScreen() {
 
               if (error) {
                 console.error('Error deleting guild event:', error);
-                Alert.alert('Error', 'Failed to delete event.');
+                Alert.alert('Error', `Failed to delete event: ${error.message}`);
                 return;
               }
 
+              console.log('Event deleted successfully');
+              Alert.alert('Success', 'Event deleted successfully!');
               await loadEvents();
             } catch (error) {
               console.error('Exception deleting guild event:', error);
+              Alert.alert('Error', 'An error occurred while deleting the event.');
             }
           },
         },
@@ -327,6 +425,178 @@ export default function GuildEventsScreen() {
     }
   };
 
+  const renderEventForm = (isEdit: boolean) => (
+    <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.formContainer}>
+        <Text style={styles.inputLabel}>Event Name</Text>
+        <TextInput
+          style={styles.input}
+          value={eventName}
+          onChangeText={setEventName}
+          placeholder="Enter event name"
+          placeholderTextColor={colors.textSecondary}
+          maxLength={100}
+        />
+
+        <Text style={styles.inputLabel}>Date</Text>
+        
+        <View style={styles.dateInputToggle}>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              !useManualDate && styles.toggleButtonActive,
+            ]}
+            onPress={() => setUseManualDate(false)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.toggleButtonText,
+                !useManualDate && styles.toggleButtonTextActive,
+              ]}
+            >
+              Calendar
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              useManualDate && styles.toggleButtonActive,
+            ]}
+            onPress={() => setUseManualDate(true)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.toggleButtonText,
+                useManualDate && styles.toggleButtonTextActive,
+              ]}
+            >
+              Manual
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {useManualDate ? (
+          <TextInput
+            style={styles.input}
+            value={manualDateInput}
+            onChangeText={setManualDateInput}
+            placeholder="MM/DD/YYYY"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="numeric"
+            maxLength={10}
+          />
+        ) : (
+          <TouchableOpacity
+            style={styles.dateTimeButton}
+            onPress={() => {
+              console.log('Opening date picker');
+              setShowDatePicker(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              ios_icon_name="calendar"
+              android_material_icon_name="calendar_today"
+              size={20}
+              color={colors.text}
+            />
+            <Text style={styles.dateTimeButtonText}>
+              {selectedDate.toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {showDatePicker && (
+          <View style={styles.pickerContainer}>
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onDateChange}
+              minimumDate={new Date()}
+              textColor={colors.text}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={() => setShowDatePicker(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        <Text style={styles.inputLabel}>Time (Eastern Time)</Text>
+        <TouchableOpacity
+          style={styles.dateTimeButton}
+          onPress={() => {
+            console.log('Opening time picker');
+            setShowTimePicker(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <IconSymbol
+            ios_icon_name="clock"
+            android_material_icon_name="access_time"
+            size={20}
+            color={colors.text}
+          />
+          <Text style={styles.dateTimeButtonText}>
+            {selectedTime.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </Text>
+        </TouchableOpacity>
+
+        {showTimePicker && (
+          <View style={styles.pickerContainer}>
+            <DateTimePicker
+              value={selectedTime}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onTimeChange}
+              textColor={colors.text}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={() => setShowTimePicker(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        <Text style={styles.timezoneNote}>
+          All times are in Eastern Time (ET)
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+          onPress={isEdit ? handleEditEvent : handleCreateEvent}
+          disabled={isSubmitting}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Event' : 'Create Event')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.dropdownContainer}>
@@ -387,18 +657,32 @@ export default function GuildEventsScreen() {
                       {formatEventDateTime(event.event_date_time)}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteEvent(event.id)}
-                    style={styles.deleteButton}
-                    activeOpacity={0.7}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
+                  <View style={styles.eventActions}>
+                    <TouchableOpacity
+                      onPress={() => openEditModal(event)}
+                      style={styles.actionButton}
+                      activeOpacity={0.7}
+                    >
+                      <IconSymbol
+                        ios_icon_name="pencil"
+                        android_material_icon_name="edit"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteEvent(event.id)}
+                      style={styles.actionButton}
+                      activeOpacity={0.7}
+                    >
+                      <IconSymbol
+                        ios_icon_name="trash"
+                        android_material_icon_name="delete"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.eventFooter}>
                   <View style={styles.countdownBadge}>
@@ -420,6 +704,7 @@ export default function GuildEventsScreen() {
         )}
       </ScrollView>
 
+      {/* Create Event Modal */}
       <Modal
         visible={showCreateModal}
         transparent
@@ -431,7 +716,16 @@ export default function GuildEventsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create Guild Event</Text>
               <TouchableOpacity
-                onPress={() => setShowCreateModal(false)}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  setEventName('');
+                  setSelectedDate(new Date());
+                  setSelectedTime(new Date());
+                  setManualDateInput('');
+                  setUseManualDate(false);
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
                 style={styles.closeButton}
                 activeOpacity={0.7}
               >
@@ -443,152 +737,46 @@ export default function GuildEventsScreen() {
                 />
               </TouchableOpacity>
             </View>
+            {renderEventForm(false)}
+          </View>
+        </View>
+      </Modal>
 
-            <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
-              <View style={styles.formContainer}>
-                <Text style={styles.inputLabel}>Event Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={eventName}
-                  onChangeText={setEventName}
-                  placeholder="Enter event name"
-                  placeholderTextColor={colors.textSecondary}
-                  maxLength={100}
+      {/* Edit Event Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Guild Event</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowEditModal(false);
+                  setEditingEvent(null);
+                  setEventName('');
+                  setSelectedDate(new Date());
+                  setSelectedTime(new Date());
+                  setManualDateInput('');
+                  setUseManualDate(false);
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+                style={styles.closeButton}
+                activeOpacity={0.7}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
                 />
-
-                <Text style={styles.inputLabel}>Date</Text>
-                
-                <View style={styles.dateInputToggle}>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleButton,
-                      !useManualDate && styles.toggleButtonActive,
-                    ]}
-                    onPress={() => setUseManualDate(false)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.toggleButtonText,
-                        !useManualDate && styles.toggleButtonTextActive,
-                      ]}
-                    >
-                      Calendar
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleButton,
-                      useManualDate && styles.toggleButtonActive,
-                    ]}
-                    onPress={() => setUseManualDate(true)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.toggleButtonText,
-                        useManualDate && styles.toggleButtonTextActive,
-                      ]}
-                    >
-                      Manual
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {useManualDate ? (
-                  <TextInput
-                    style={styles.input}
-                    value={manualDateInput}
-                    onChangeText={setManualDateInput}
-                    placeholder="MM/DD/YYYY"
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                    maxLength={10}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    style={styles.dateTimeButton}
-                    onPress={() => {
-                      console.log('Opening date picker');
-                      setShowDatePicker(true);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <IconSymbol
-                      ios_icon_name="calendar"
-                      android_material_icon_name="calendar_today"
-                      size={20}
-                      color={colors.text}
-                    />
-                    <Text style={styles.dateTimeButtonText}>
-                      {selectedDate.toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={selectedDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onDateChange}
-                    minimumDate={new Date()}
-                  />
-                )}
-
-                <Text style={styles.inputLabel}>Time (Eastern Time)</Text>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => {
-                    console.log('Opening time picker');
-                    setShowTimePicker(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <IconSymbol
-                    ios_icon_name="clock"
-                    android_material_icon_name="access_time"
-                    size={20}
-                    color={colors.text}
-                  />
-                  <Text style={styles.dateTimeButtonText}>
-                    {selectedTime.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </Text>
-                </TouchableOpacity>
-
-                {showTimePicker && (
-                  <DateTimePicker
-                    value={selectedTime}
-                    mode="time"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onTimeChange}
-                  />
-                )}
-
-                <Text style={styles.timezoneNote}>
-                  All times are in Eastern Time (ET)
-                </Text>
-
-                <TouchableOpacity
-                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-                  onPress={handleCreateEvent}
-                  disabled={isSubmitting}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {isSubmitting ? 'Creating...' : 'Create Event'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+              </TouchableOpacity>
+            </View>
+            {renderEventForm(true)}
           </View>
         </View>
       </Modal>
@@ -692,7 +880,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-  deleteButton: {
+  eventActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
     padding: 4,
   },
   eventFooter: {
@@ -801,6 +993,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     fontWeight: '500',
+  },
+  pickerContainer: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.textSecondary,
+    marginTop: 8,
+  },
+  doneButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
   timezoneNote: {
     fontSize: 12,
