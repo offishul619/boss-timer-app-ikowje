@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '@/styles/commonStyles';
+import DropdownMenu from '@/components/DropdownMenu';
 
 const REMINDER_NOTIFICATIONS_KEY = '@reminder_notifications_enabled';
 const BOSS_SPAWN_NOTIFICATIONS_KEY = '@boss_spawn_notifications_enabled';
@@ -59,6 +60,9 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.dropdownContainer}>
+        <DropdownMenu />
+      </View>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -114,6 +118,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    top: 60,
+    right: 0,
+    zIndex: 1000,
   },
   scrollView: {
     flex: 1,
