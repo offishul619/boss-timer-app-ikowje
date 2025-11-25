@@ -6,8 +6,12 @@ export default function TabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger key="home" name="(home)">
-        <Icon sf="house.fill" />
-        <Label>Home</Label>
+        <Icon sf="timer" />
+        <Label>Timer</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger key="guild-events" name="guild-events">
+        <Icon sf="calendar" />
+        <Label>Events</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger key="settings" name="settings">
         <Icon sf="gear" />
