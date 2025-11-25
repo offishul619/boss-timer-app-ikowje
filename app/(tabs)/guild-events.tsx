@@ -37,6 +37,8 @@ export default function GuildEventsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [manualDateInput, setManualDateInput] = useState('');
+  const [useManualDate, setUseManualDate] = useState(false);
 
   useEffect(() => {
     loadEvents();
@@ -45,6 +47,7 @@ export default function GuildEventsScreen() {
 
   const loadEvents = async () => {
     try {
+      console.log('Loading guild events...');
       const { data, error } = await supabase
         .from('guild_events')
         .select('*')
@@ -56,6 +59,7 @@ export default function GuildEventsScreen() {
       }
 
       if (data) {
+        console.log('Guild events loaded:', data);
         // Filter out past events
         const now = Date.now();
         const upcomingEvents = data.filter(event => event.event_date_time > now);
@@ -86,6 +90,24 @@ export default function GuildEventsScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const parseManualDate = (dateString: string): Date | null => {
+    // Expected format: MM/DD/YYYY
+    const parts = dateString.split('/');
+    if (parts.length !== 3) return null;
+
+    const month = parseInt(parts[0], 10);
+    const day = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+
+    if (isNaN(month) || isNaN(day) || isNaN(year)) return null;
+    if (month < 1 || month > 12) return null;
+    if (day < 1 || day > 31) return null;
+    if (year < 2000 || year > 2100) return null;
+
+    const date = new Date(year, month - 1, day);
+    return date;
   };
 
   const convertToEasternTime = (date: Date, time: Date): number => {
@@ -142,10 +164,21 @@ export default function GuildEventsScreen() {
       return;
     }
 
+    // Determine which date to use
+    let dateToUse = selectedDate;
+    if (useManualDate && manualDateInput.trim()) {
+      const parsedDate = parseManualDate(manualDateInput);
+      if (!parsedDate) {
+        Alert.alert('Error', 'Invalid date format. Please use MM/DD/YYYY');
+        return;
+      }
+      dateToUse = parsedDate;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const eventDateTime = convertToEasternTime(selectedDate, selectedTime);
+      const eventDateTime = convertToEasternTime(dateToUse, selectedTime);
       const now = Date.now();
 
       if (eventDateTime <= now) {
@@ -153,6 +186,11 @@ export default function GuildEventsScreen() {
         setIsSubmitting(false);
         return;
       }
+
+      console.log('Creating guild event:', {
+        event_name: eventName,
+        event_date_time: eventDateTime,
+      });
 
       const { data, error } = await supabase
         .from('guild_events')
@@ -164,12 +202,12 @@ export default function GuildEventsScreen() {
 
       if (error) {
         console.error('Error creating guild event:', error);
-        Alert.alert('Error', 'Failed to create event. Please try again.');
+        Alert.alert('Error', `Failed to create event: ${error.message}`);
         setIsSubmitting(false);
         return;
       }
 
-      console.log('Guild event created:', data);
+      console.log('Guild event created successfully:', data);
 
       // Schedule notification
       await scheduleEventNotification(eventName, eventDateTime);
@@ -178,6 +216,8 @@ export default function GuildEventsScreen() {
       setEventName('');
       setSelectedDate(new Date());
       setSelectedTime(new Date());
+      setManualDateInput('');
+      setUseManualDate(false);
       setShowCreateModal(false);
       
       Alert.alert('Success', 'Guild event created successfully!');
@@ -254,6 +294,36 @@ export default function GuildEventsScreen() {
       return `${hours}h ${minutes}m`;
     } else {
       return `${minutes}m`;
+    }
+  };
+
+  const onDateChange = (event: any, date?: Date) => {
+    console.log('Date picker event:', event.type, date);
+    
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    if (event.type === 'set' && date) {
+      setSelectedDate(date);
+      console.log('Date selected:', date);
+    } else if (event.type === 'dismissed') {
+      console.log('Date picker dismissed');
+    }
+  };
+
+  const onTimeChange = (event: any, time?: Date) => {
+    console.log('Time picker event:', event.type, time);
+    
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    
+    if (event.type === 'set' && time) {
+      setSelectedTime(time);
+      console.log('Time selected:', time);
+    } else if (event.type === 'dismissed') {
+      console.log('Time picker dismissed');
     }
   };
 
@@ -374,99 +444,151 @@ export default function GuildEventsScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.formContainer}>
-              <Text style={styles.inputLabel}>Event Name</Text>
-              <TextInput
-                style={styles.input}
-                value={eventName}
-                onChangeText={setEventName}
-                placeholder="Enter event name"
-                placeholderTextColor={colors.textSecondary}
-                maxLength={100}
-              />
-
-              <Text style={styles.inputLabel}>Date</Text>
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowDatePicker(true)}
-                activeOpacity={0.7}
-              >
-                <IconSymbol
-                  ios_icon_name="calendar"
-                  android_material_icon_name="calendar_today"
-                  size={20}
-                  color={colors.text}
+            <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
+              <View style={styles.formContainer}>
+                <Text style={styles.inputLabel}>Event Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={eventName}
+                  onChangeText={setEventName}
+                  placeholder="Enter event name"
+                  placeholderTextColor={colors.textSecondary}
+                  maxLength={100}
                 />
-                <Text style={styles.dateTimeButtonText}>
-                  {selectedDate.toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </Text>
-              </TouchableOpacity>
 
-              {showDatePicker && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setShowDatePicker(Platform.OS === 'ios');
-                    if (date) setSelectedDate(date);
+                <Text style={styles.inputLabel}>Date</Text>
+                
+                <View style={styles.dateInputToggle}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      !useManualDate && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => setUseManualDate(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.toggleButtonText,
+                        !useManualDate && styles.toggleButtonTextActive,
+                      ]}
+                    >
+                      Calendar
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      useManualDate && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => setUseManualDate(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.toggleButtonText,
+                        useManualDate && styles.toggleButtonTextActive,
+                      ]}
+                    >
+                      Manual
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {useManualDate ? (
+                  <TextInput
+                    style={styles.input}
+                    value={manualDateInput}
+                    onChangeText={setManualDateInput}
+                    placeholder="MM/DD/YYYY"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.dateTimeButton}
+                    onPress={() => {
+                      console.log('Opening date picker');
+                      setShowDatePicker(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <IconSymbol
+                      ios_icon_name="calendar"
+                      android_material_icon_name="calendar_today"
+                      size={20}
+                      color={colors.text}
+                    />
+                    <Text style={styles.dateTimeButtonText}>
+                      {selectedDate.toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+
+                <Text style={styles.inputLabel}>Time (Eastern Time)</Text>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => {
+                    console.log('Opening time picker');
+                    setShowTimePicker(true);
                   }}
-                  minimumDate={new Date()}
-                />
-              )}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol
+                    ios_icon_name="clock"
+                    android_material_icon_name="access_time"
+                    size={20}
+                    color={colors.text}
+                  />
+                  <Text style={styles.dateTimeButtonText}>
+                    {selectedTime.toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                    })}
+                  </Text>
+                </TouchableOpacity>
 
-              <Text style={styles.inputLabel}>Time (Eastern Time)</Text>
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowTimePicker(true)}
-                activeOpacity={0.7}
-              >
-                <IconSymbol
-                  ios_icon_name="clock"
-                  android_material_icon_name="access_time"
-                  size={20}
-                  color={colors.text}
-                />
-                <Text style={styles.dateTimeButtonText}>
-                  {selectedTime.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                  })}
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onTimeChange}
+                  />
+                )}
+
+                <Text style={styles.timezoneNote}>
+                  All times are in Eastern Time (ET)
                 </Text>
-              </TouchableOpacity>
 
-              {showTimePicker && (
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  display="default"
-                  onChange={(event, time) => {
-                    setShowTimePicker(Platform.OS === 'ios');
-                    if (time) setSelectedTime(time);
-                  }}
-                />
-              )}
-
-              <Text style={styles.timezoneNote}>
-                All times are in Eastern Time (ET)
-              </Text>
-
-              <TouchableOpacity
-                style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-                onPress={handleCreateEvent}
-                disabled={isSubmitting}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.submitButtonText}>
-                  {isSubmitting ? 'Creating...' : 'Create Event'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                  onPress={handleCreateEvent}
+                  disabled={isSubmitting}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.submitButtonText}>
+                    {isSubmitting ? 'Creating...' : 'Create Event'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -603,7 +725,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
     paddingHorizontal: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -619,8 +741,12 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
+  formScrollView: {
+    flex: 1,
+  },
   formContainer: {
     gap: 16,
+    paddingBottom: 20,
   },
   inputLabel: {
     fontSize: 16,
@@ -636,6 +762,30 @@ const styles = StyleSheet.create({
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.textSecondary,
+  },
+  dateInputToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  toggleButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  toggleButtonTextActive: {
+    color: colors.text,
   },
   dateTimeButton: {
     flexDirection: 'row',
