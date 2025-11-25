@@ -12,8 +12,8 @@ export default function TabLayout() {
       label: 'Timer',
     },
     {
-      name: 'profile',
-      route: '/(tabs)/profile',
+      name: 'settings',
+      route: '/(tabs)/settings',
       icon: 'settings',
       label: 'Settings',
     },
@@ -28,6 +28,7 @@ export default function TabLayout() {
         }}
       >
         <Stack.Screen key="home" name="(home)" />
+        <Stack.Screen key="settings" name="settings" />
         <Stack.Screen key="profile" name="profile" />
       </Stack>
       <FloatingTabBar tabs={tabs} />

@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isBossSpawnNotificationsEnabled } from '@/utils/notificationPreferences';
 
 const PUSH_TOKEN_KEY = '@push_token';
 
@@ -97,6 +98,13 @@ export const savePushTokenToSupabase = async (token: string): Promise<boolean> =
 
 export const sendBossSpawnNotification = async (): Promise<boolean> => {
   try {
+    // Check if boss spawn notifications are enabled
+    const isEnabled = await isBossSpawnNotificationsEnabled();
+    if (!isEnabled) {
+      console.log('Boss spawn notifications are disabled by user preference');
+      return true; // Return true because it's not an error, just disabled
+    }
+
     if (!isSupabaseConfigured()) {
       console.log('Supabase is not configured. Cannot send notifications to other users.');
       return false;

@@ -19,6 +19,7 @@ import {
   subscribeToSpawnUpdates,
   unsubscribeFromSpawnUpdates,
 } from '@/services/bossTimerService';
+import DropdownMenu from '@/components/DropdownMenu';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -244,6 +245,9 @@ export default function HomeScreen() {
       resizeMode="cover"
     >
       <View style={styles.overlay} />
+      <View style={styles.dropdownContainer}>
+        <DropdownMenu />
+      </View>
       <View style={styles.container}>
         <View style={styles.content}>
           <View style={styles.timerCard}>
@@ -285,6 +289,12 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 48 : 60,
+    right: 0,
+    zIndex: 1000,
   },
   container: {
     flex: 1,
